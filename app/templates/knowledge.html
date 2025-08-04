@@ -1,34 +1,48 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Knowledge Upload</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Hello!</h1>
 
     <form action="/upload" method="post" enctype="multipart/form-data">
-        <label for="files">Select files:</label><br><br>
-        <input type="file" name="files" multiple><br><br>
-        <button type="submit">Upload Files</button>
+      <label for="files">Select files:</label><br /><br />
+      <input type="file" name="files" multiple /><br /><br />
+      <button type="submit">Upload Files</button>
     </form>
 
     <h1>Uploaded Files</h1>
 
     {% if jobs %}
-        <ul>
-            {% for job in jobs %}
-                <li>
-                    {{ job.filename }} - 
-                    {% if job.error == "None" %}
-                        <span style="color:green;">Success</span>
-                    {% else %}
-                        <span style="color:red;">Error: {{ job.error }}</span>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
+    <ul>
+      {% for job in jobs %}
+      <li>
+        {{ job.filename }} - {% if job.error == "None" %}
+        <span style="color: green">Success</span>
+        {% else %}
+        <span style="color: red">Error: {{ job.error }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
     {% else %}
-        <p>No uploads yet.</p>
+    <p>No uploads yet.</p>
     {% endif %}
-</body>
+
+    <form action="/query" method="post" enctype="multipart/form-data">
+      <label for="query">Information:</label><br />
+      <input type="text" id="query" name="query" /><br /><br />
+
+      <button type="submit">Query Information</button>
+    </form>
+
+    <ul>
+      {% for information in informations %}
+      <li>
+        <p>{{information}}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </body>
 </html>
