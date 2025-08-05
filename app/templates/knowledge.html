@@ -29,20 +29,5 @@
     {% else %}
     <p>No uploads yet.</p>
     {% endif %}
-
-    <form action="/query" method="post" enctype="multipart/form-data">
-      <label for="query">Information:</label><br />
-      <input type="text" id="query" name="query" /><br /><br />
-
-      <button type="submit">Query Information</button>
-    </form>
-
-    <ul>
-      {% for information in informations %}
-      <li>
-        <p>{{information}}</p>
-      </li>
-      {% endfor %}
-    </ul>
   </body>
 </html>

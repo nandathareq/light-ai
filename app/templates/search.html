@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Knowledge Upload</title>
+  </head>
+  <body>
+    <form action="/search" method="get">
+      <label for="input">Information:</label><br />
+      <input type="text" id="input" name="input" /><br /><br />
+      <button type="submit">Query Information</button>
+    </form>
+
+    <ul>
+      {% for result in results %}
+      <li>
+        <p>{{result}}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
