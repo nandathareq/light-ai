@@ -10,11 +10,27 @@ from sqlalchemy.orm import Session
 from enum import Enum
 from models.vector_store import collection
 from langchain.text_splitter import TokenTextSplitter
+from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain_community.document_compressors.rankllm_rerank import RankLLMRerank
+from langchain.schema import Document, BaseRetriever
+from langchain_ollama import OllamaLLM
+
+llm = OllamaLLM(model="llama3.1:8b")
 
 class Status(Enum):
     PROCESSING = "processing"
     COMPLETE = "complete"
     FAILED = "failed"
+    
+class StaticListRetriever(BaseRetriever):
+    def __init__(self, documents):
+        self.documents = documents
+
+    def get_relevant_documents(self, query):
+        return self.documents
+
+    async def aget_relevant_documents(self, query):
+        return self.documents
     
 def retrieve_knowledge(query : str): 
     semantic_result = collection.query(
@@ -29,7 +45,18 @@ def retrieve_knowledge(query : str):
         results = semantic_result['documents'][0] + fulltext_result['documents']
     else:
         results = ["No results found."]
-    return results
+
+    docs = [Document(page_content=txt) for txt in results]
+    
+    retriever = StaticListRetriever(docs)
+
+    compressor = RankLLMRerank(llm=llm, top_n=2)
+    compression = ContextualCompressionRetriever(base_retriever=retriever,base_compressor=compressor)
+    
+    results = compression.get_relevant_documents("your query here")
+    list_of_strings = [doc.page_content for doc in results]
+    
+    return list_of_strings
 
 def get_files_status(db:Session):
     return map(lambda file : {"filename":file.filename,"error":file.message},get_files(db=db))

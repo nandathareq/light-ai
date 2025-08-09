@@ -19,17 +19,6 @@ router = APIRouter()
 async def show_search_page(request: Request, input: str = Query(None)):
     if not input:
         return templates.TemplateResponse("search.html", {"request": request, "results": ["please input keyword"]})
-
-    # query_result = collection.query(
-    #     query_texts=[input],
-    #     n_results=10
-    # )
-    
-    # results = []
-    # if query_result.get('documents'):
-    #     results = query_result['documents'][0]
-    # else:
-    #     results = ["No results found."]
     
     return templates.TemplateResponse("search.html", {"request": request, "results": retrieve_knowledge(input)})
 
