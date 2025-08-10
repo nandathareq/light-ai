@@ -1,62 +1,42 @@
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 import tempfile
-import uuid
 from fastapi import UploadFile
 from models.file import FileUpdate, create_file, FileCreate, get_files, update_file, File
 from sqlalchemy.orm import Session
 from enum import Enum
-from models.vector_store import collection
 from langchain.text_splitter import TokenTextSplitter
-from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain_community.document_compressors.rankllm_rerank import RankLLMRerank
-from langchain.schema import Document, BaseRetriever
 from langchain_ollama import OllamaLLM
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaEmbeddings
 
-llm = OllamaLLM(model="llama3.1:8b")
+llm = OllamaLLM(model="qwen3:8b")
+embedding_function = OllamaEmbeddings(model="nomic-embed-text")
+persist_directory = os.path.join(os.getcwd(), "vector_store")
 
 class Status(Enum):
     PROCESSING = "processing"
     COMPLETE = "complete"
     FAILED = "failed"
     
-class StaticListRetriever(BaseRetriever):
-    def __init__(self, documents):
-        self.documents = documents
-
-    def get_relevant_documents(self, query):
-        return self.documents
-
-    async def aget_relevant_documents(self, query):
-        return self.documents
-    
 def retrieve_knowledge(query : str): 
-    semantic_result = collection.query(
-        query_texts=[query],
-        n_results=10
+    vectorstore = Chroma(
+        collection_name="my_collection",
+        embedding_function=embedding_function,
+        persist_directory=persist_directory
     )
     
-    fulltext_result = collection.get(where_document={"$contains": query})
+    retriever = vectorstore.as_retriever(search_kwargs={'k': 10})
+    semantic_result = retriever.invoke(query)
     
     results = []
-    if semantic_result.get('documents'):
-        results = semantic_result['documents'][0] + fulltext_result['documents']
+    if semantic_result:
+        results = semantic_result
     else:
         results = ["No results found."]
 
-    docs = [Document(page_content=txt) for txt in results]
-    
-    retriever = StaticListRetriever(docs)
-
-    compressor = RankLLMRerank(llm=llm, top_n=2)
-    compression = ContextualCompressionRetriever(base_retriever=retriever,base_compressor=compressor)
-    
-    results = compression.get_relevant_documents("your query here")
-    list_of_strings = [doc.page_content for doc in results]
-    
-    return list_of_strings
+    return [doc.page_content for doc in results]
 
 def get_files_status(db:Session):
     return map(lambda file : {"filename":file.filename,"error":file.message},get_files(db=db))
@@ -87,11 +67,11 @@ async def process_file(file: UploadFile, db: Session):
         splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=100)
         chunks = splitter.split_documents(documents)
         
-        ids = [str(uuid.uuid4()) for i in range(len(chunks))]
-        texts = [chunk.page_content for chunk in chunks]
-        metadatas = [chunk.metadata for chunk in chunks]
-        
-        collection.add(ids=ids, metadatas=metadatas, documents=texts)
+        Chroma.from_documents(
+        chunks,
+        embedding_function,
+        collection_name="my_collection",
+        persist_directory=persist_directory)
         
         update_file(db, file_upload.id, FileUpdate(status=Status.COMPLETE, message=None))
 

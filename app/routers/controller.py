@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 from typing import List
 from models.database import get_db
 from services.knowledge import get_files_status, process_file,retrieve_knowledge
-from models.vector_store import collection
 from sqlalchemy.orm import Session
 
 router = APIRouter()
