@@ -1,3 +1,4 @@
+from typing import Generator
 from langchain_community.document_loaders import TextLoader
 from langchain_community.document_loaders import PyPDFLoader
 import os
@@ -20,7 +21,23 @@ class Status(Enum):
     COMPLETE = "complete"
     FAILED = "failed"
     
-def retrieve_knowledge(query : str): 
+def generate_summary(query : str , documents : list[str]) -> Generator[str, None, None]:
+    
+    context = "\n\n".join(documents)
+    prompt = f"""
+            You are a helpful assistant. The user has the query: "{query}"
+
+            Here are the retrieved documents:
+            \"\"\"{context}\"\"\"
+
+            Please write a concise, clear summary that answers the query using the provided documents.
+            Do not include your reasoning steps or any explanation of how you arrived at the answer.
+            If the documents do not contain enough information, say so explicitly.
+            """
+    for chunk in llm.stream(prompt):
+        yield chunk
+    
+def retrieve_knowledge(query : str) -> list[str]: 
     vectorstore = Chroma(
         collection_name="my_collection",
         embedding_function=embedding_function,

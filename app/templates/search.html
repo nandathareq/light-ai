@@ -10,6 +10,8 @@
       <button type="submit">Query Information</button>
     </form>
 
+    <P id="summary"></P>
+
     <ul>
       {% for result in results %}
       <li>
@@ -17,5 +19,31 @@
       </li>
       {% endfor %}
     </ul>
+    <script>
+(async function() {
+    const response = await fetch(`http://127.0.0.1:8000/summary/{{ summary_id }}`, {
+        method: "GET",
+        headers: { "Accept": "text/plain" }
+    });
+
+    if (!response.body) {
+        console.error("No stream received.");
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+
+    while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        if (value) {
+            const chunk = decoder.decode(value);
+            document.getElementById("summary").textContent += chunk;
+        }
+        done = streamDone;
+    }
+})();
+    </script>
   </body>
 </html>
