@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String
 from .database import Base
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,relationship
 
 class File(Base):
     __tablename__ = "files"
@@ -10,6 +10,8 @@ class File(Base):
     filename = Column(String, unique=True, index=True, nullable=False)
     status = Column(String, nullable=False)
     message = Column(String, nullable=True)
+    
+    chunks = relationship("Chunk", back_populates="file")
     
 class FileCreate(BaseModel):
     filename: str

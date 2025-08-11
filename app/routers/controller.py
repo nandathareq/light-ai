@@ -26,18 +26,18 @@ def get_user(summary_id: str):
     )
 
 @router.get("/search", response_class=HTMLResponse)
-async def show_search_page(request: Request, input: str = Query(None)):
+async def show_search_page(request: Request, input: str = Query(None), db: Session = Depends(get_db)):
 
     if not input:
         return templates.TemplateResponse("search.html", {"request": request, "results": ["please input keyword"]})
     
-    documents = retrieve_knowledge(input)
+    documents = retrieve_knowledge(db, input)
     summary_id = str(uuid4())
     summaryCache[summary_id] = {
         "query":input,
         "documents":documents
     }
-    
+
     return templates.TemplateResponse("search.html", {"request": request, "results": documents, "summary_id":summary_id})
 
 @router.get("/knowledge", response_class=HTMLResponse)
