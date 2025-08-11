@@ -8,23 +8,29 @@ from models.chunk import ChunkCreate, create_chunks, get_chunks
 from models.file import FileUpdate, create_file, FileCreate, get_files, update_file, File
 from sqlalchemy.orm import Session
 from enum import Enum
-from langchain.text_splitter import TokenTextSplitter
 from langchain_ollama import OllamaLLM
 from langchain_ollama import OllamaEmbeddings
 from langchain.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
-from langchain.retrievers.document_compressors import LLMChainFilter
+from langchain_text_splitters import NLTKTextSplitter
+import nltk
+import logging
+
+nltk.download('punkt_tab')
+logging.basicConfig(
+    level=logging.INFO,  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 llm = OllamaLLM(model="qwen3:8b")
 embedding = OllamaEmbeddings(model="nomic-embed-text")
-persist_directory = os.path.join(os.getcwd(), "vector_store")
-compressor = LLMChainFilter.from_llm(llm)
+text_splitter = NLTKTextSplitter(chunk_size=1000)
 
 class Status(Enum):
     PROCESSING = "processing"
     COMPLETE = "complete"
-    
     FAILED = "failed"
     
 def generate_summary(query : str , documents : list[str]) -> Generator[str, None, None]:
@@ -45,26 +51,32 @@ def generate_summary(query : str , documents : list[str]) -> Generator[str, None
         yield chunk
     
 def retrieve_knowledge(db:Session, query : str) -> list[str]: 
-
+    logger.info("process request")
     chunks = [chunk.text for chunk in get_chunks(db, keywords=query.split())]
+    logger.info("end chunking")
 
     bm25_retriever = BM25Retriever.from_texts(
         chunks, metadatas=[{"source": 1}] * len(chunks)
     )
     
     bm25_retriever.k = 10
-        
+    
+    logger.info("end BM25")
+
     faiss_vectorstore = FAISS.from_texts(
         chunks, embedding, metadatas=[{"source": 2}] * len(chunks)
     )
     
     faiss_retriever = faiss_vectorstore.as_retriever(search_kwargs={"k": 10})
     
+    logger.info("end faiss")
+
     ensemble_retriever = EnsembleRetriever(
     retrievers=[bm25_retriever, faiss_retriever], weights=[0.5, 0.5]
     )
     
-    
+    logger.info("end ensemble")
+
     docs = ensemble_retriever.invoke(query)
 
     return [doc.page_content for doc in docs]
@@ -92,13 +104,21 @@ async def process_file(file: UploadFile, db: Session):
             loader = TextLoader(file_path)
         else:
             loader = PyPDFLoader(file_path)
-            
+
         documents = loader.load()
         
-        splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=100)
-        chunks = splitter.split_documents(documents)
+        text_splitter = NLTKTextSplitter(chunk_size=200)
         
-        create_chunks(db, [ChunkCreate(fileid=str(file_upload.id), text=doc.page_content) for doc in chunks])
+        chunks = text_splitter.split_text("\n".join(doc.page_content for doc in documents))
+
+        vectors = embedding.embed_documents(chunks)
+        
+        chunk_creates = [
+        ChunkCreate(fileid=file_upload.id, text=chunk_text, vector=vector)
+        for chunk_text, vector in zip(chunks, vectors)
+        ]
+
+        create_chunks(db, chunk_creates)
         
         update_file(db, file_upload.id, FileUpdate(status=Status.COMPLETE, message=None))
 
